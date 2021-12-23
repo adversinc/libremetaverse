@@ -300,6 +300,11 @@ namespace OpenMetaverse
             remove { lock (m_EventQueueRunningLock) { m_EventQueueRunning -= value; } }
         }
 
+        /// <summary>
+        /// Fires when something happens with our Caps
+        /// </summary>
+        public event Caps.CapsErrorCallback CapsError;
+
         #endregion Delegates
 
         #region Properties
@@ -563,6 +568,10 @@ namespace OpenMetaverse
             {
                 // We're not tracking this sim, create a new Simulator object
                 simulator = new Simulator(Client, endPoint, handle);
+
+                simulator.CapsError += (sender, e) => {
+                    CapsError?.Invoke(sender, e);
+                };
 
                 // Immediately add this simulator to the list of current sims. It will be removed if the
                 // connection fails

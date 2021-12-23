@@ -59,6 +59,12 @@ namespace OpenMetaverse
         private readonly ObjectPool<UDPPacketBuffer> _packetPool =
             new DefaultObjectPool<UDPPacketBuffer>(new DefaultPooledObjectPolicy<UDPPacketBuffer>());
 
+        private long MaxReceiveTime;
+        private long LastPacketTime;
+        private long LastPacketDebug;
+        private int BiggestPacket;
+        private int NumPackets;
+
         /// <summary>
         /// Initialize the UDP packet handler in server mode
         /// </summary>
@@ -213,7 +219,36 @@ namespace OpenMetaverse
             {
                 // get the length of data actually read from the socket, store it with the
                 // buffer
+                var start = Now();
                 buffer.DataLength = udpSocket.EndReceiveFrom(iar, ref buffer.RemoteEndPoint);
+                var end = Now();
+                if(end - start > MaxReceiveTime) {
+                    MaxReceiveTime = end - start;
+                }
+
+                if(buffer.DataLength > BiggestPacket) {
+                    BiggestPacket = buffer.DataLength;
+                }
+
+                if(LastPacketDebug < end - 10*1000) {
+                    LastPacketDebug = end;
+                    
+                    Logger.Log(
+                        $"[UDPBase] Packet from {((IPEndPoint) buffer.RemoteEndPoint)} ({end - LastPacketTime}ms and {NumPackets} packets, {BiggestPacket} biggest, {MaxReceiveTime}ms maxtime)",
+                        Helpers.LogLevel.Debug);
+
+                    if(LastPacketTime > 0 && end - LastPacketTime > 20*1000) {
+                        Logger.Log(
+                            $"[UDPBase] Packets from {((IPEndPoint) buffer.RemoteEndPoint)} were missing for {end - LastPacketTime} seconds",
+                            Helpers.LogLevel.Error);
+                    }
+
+                    BiggestPacket = 0;
+                    NumPackets = 0;
+                }
+
+                NumPackets++;
+                LastPacketTime = end;
 
                 // call the abstract method PacketReceived(), passing the buffer that
                 // has just been filled from the socket read.
@@ -264,5 +299,9 @@ namespace OpenMetaverse
         //    catch (SocketException) { }
         //    catch (ObjectDisposedException) { }
         //}
+
+        long Now() {
+           return (DateTime.UtcNow.Ticks - 621355968000000000) / 10000;
+        }
     }
 }

@@ -61,6 +61,7 @@ namespace OpenMetaverse
         {
             LogInstance = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
+            return;
             // If error level reporting isn't enabled we assume no logger is configured and initialize a default
             // ConsoleAppender
             if (!LogInstance.Logger.IsEnabledFor(log4net.Core.Level.Error))

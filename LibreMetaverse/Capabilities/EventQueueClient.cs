@@ -31,6 +31,17 @@ using OpenMetaverse.StructuredData;
 
 namespace OpenMetaverse.Http
 {
+    public enum EventQueueError {
+        NotFoundOnRun,
+        NotFoundOnInit
+    }
+    
+    public class CapsErrorArgs {
+        public EventQueueError Error { get; set; }
+        public HttpWebRequest Request { get; set; }
+        public HttpWebResponse Response { get; set; }
+    }
+    
     public class EventQueueClient
     {
         private const string REQUEST_CONTENT_TYPE = "application/llsd+xml";
@@ -167,7 +178,7 @@ namespace OpenMetaverse.Http
                         // Try to log a meaningful error message
                         if (code != HttpStatusCode.OK)
                         {
-                            Logger.Log($"Unrecognized caps connection problem from {_Address}: {code}", 
+                            Logger.Log($"Unrecognized caps connection problem from {_Address}: {code}, errors: {_errorCount}", 
                                 Helpers.LogLevel.Warning);
                         }
                         else if (error.InnerException != null)
