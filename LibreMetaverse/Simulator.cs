@@ -512,6 +512,9 @@ namespace OpenMetaverse
 
 
         private ManualResetEvent GotUseCircuitCodeAck = new ManualResetEvent(false);
+        private long LastPacketDebug;
+        private long LastPacketTime;
+
         #endregion Internal/Private Members
 
         /// <summary>
@@ -1060,6 +1063,21 @@ namespace OpenMetaverse
                     ((IPEndPoint)buffer.RemoteEndPoint), Helpers.LogLevel.Warning, Client);
                 return;
             }
+            
+            long epoch = (DateTime.UtcNow.Ticks - 621355968000000000) / 10000000;
+            if(LastPacketDebug < epoch - 10) {
+                LastPacketDebug = epoch;
+                Logger.Log(
+                    $"Received packet from {((IPEndPoint) buffer.RemoteEndPoint)} ({epoch - LastPacketTime}s since last packet)",
+                    Helpers.LogLevel.Debug, Client);
+
+                if(LastPacketTime > 0 && epoch - LastPacketTime > 20) {
+                    Logger.Log($"Packets from {((IPEndPoint) buffer.RemoteEndPoint)} were missing for {epoch - LastPacketTime} seconds",
+                    Helpers.LogLevel.Error, Client);
+                }
+            }
+
+            LastPacketTime = epoch;
 
             // Update the disconnect flag so this sim doesn't time out
             DisconnectCandidate = false;
