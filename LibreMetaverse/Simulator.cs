@@ -1076,9 +1076,9 @@ namespace OpenMetaverse
             long epoch = (DateTime.UtcNow.Ticks - 621355968000000000) / 10000000;
             if(LastPacketDebug < epoch - 10) {
                 LastPacketDebug = epoch;
-                Logger.Log(
-                    $"Received packet from {((IPEndPoint) buffer.RemoteEndPoint)} ({epoch - LastPacketTime}s since last packet)",
-                    Helpers.LogLevel.Debug, Client);
+                //Logger.Log(
+                //   $"Received packet from {((IPEndPoint) buffer.RemoteEndPoint)} ({epoch - LastPacketTime}s since last packet)",
+                //Helpers.LogLevel.Debug, Client);
 
                 if(LastPacketTime > 0 && epoch - LastPacketTime > 20) {
                     Logger.Log($"Packets from {((IPEndPoint) buffer.RemoteEndPoint)} were missing for {epoch - LastPacketTime} seconds",
