@@ -29,6 +29,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using OpenMetaverse.Packets;
 using OpenMetaverse.StructuredData;
 using OpenMetaverse.Interfaces;
@@ -54,6 +55,9 @@ namespace OpenMetaverse
 
         public delegate void EventQueueCallback(string capsKey, IMessage message, Simulator simulator);
 
+        /// <summary>Caps error handler</summary>
+        public delegate void CapsErrorCallback(object sender, CapsErrorArgs e);
+
         /// <summary>Reference to the simulator this system is connected to</summary>
         public Simulator Simulator;
 
@@ -62,6 +66,7 @@ namespace OpenMetaverse
 
         private CapsClient _SeedRequest;
         private EventQueueClient _EventQueueCap = null;
+        private int Caps404Count = 0;
 
         /// <summary>Capabilities URI this system was initialized with</summary>
         public string SeedCapsURI => _SeedCapsURI;
@@ -69,6 +74,13 @@ namespace OpenMetaverse
         /// <summary>Whether the capabilities event queue is connected and
         /// listening for incoming events</summary>
         public bool IsEventQueueRunning => _EventQueueCap != null && _EventQueueCap.Running;
+
+        /// <summary>
+        /// Fires when something wrong happens with Caps
+        /// </summary>
+        public event CapsErrorCallback CapsError;
+        
+        public Dictionary<string, Uri> CapsDict => _Caps;
 
         /// <summary>
         /// Default constructor
@@ -291,8 +303,28 @@ namespace OpenMetaverse
                 ((HttpWebResponse)exception.Response).StatusCode == HttpStatusCode.NotFound)
             {
                 // 404 error
-                Logger.Log("Seed capability returned a 404, capability system is aborting",
-                    Helpers.LogLevel.Error);
+                Caps404Count++;
+                
+                if(Caps404Count > 3) {
+                    Logger.Log("Seed capability returned a 404, capability system is aborting",
+                        Helpers.LogLevel.Error);
+
+                    var response = (HttpWebResponse) ((WebException) error).Response;
+                    try {
+                        var args = new CapsErrorArgs {
+                            Response = response,
+                            Error = EventQueueError.NotFoundOnInit
+                        };
+                        CapsError?.Invoke(this, args);
+                    } catch(Exception ex) {
+                        Logger.Log($"CapsError callback error: {ex.Message}", Helpers.LogLevel.Error, ex);
+                    }
+
+                } else {
+                    Logger.Log($"Seed capability returned a 404 (try {Caps404Count}), retrying", Helpers.LogLevel.Error);
+                    Thread.Sleep(3*1000);
+                    MakeSeedRequest();
+                }
             }
             else
             {

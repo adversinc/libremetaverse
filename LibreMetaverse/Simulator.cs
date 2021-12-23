@@ -444,6 +444,11 @@ namespace OpenMetaverse
         /// </summary>
         public bool AgentMovementComplete;
 
+        /// <summary>
+        /// Fires when something happens with our Caps
+        /// </summary>
+        public event Caps.CapsErrorCallback CapsError;
+
         #endregion Public Members
 
         #region Properties
@@ -696,9 +701,13 @@ namespace OpenMetaverse
             if (Client.Settings.ENABLE_CAPS)
             {
                 // Connect to the new CAPS system
-                if (!String.IsNullOrEmpty(seedcaps))
+                if(!String.IsNullOrEmpty(seedcaps)) {
                     Caps = new Caps(this, seedcaps);
-                else
+
+                    Caps.CapsError += (sender, e) => {
+                        CapsError?.Invoke(sender, e);
+                    };
+                }  else
                     Logger.Log("Setting up a sim without a valid capabilities server!", Helpers.LogLevel.Error, Client);
             }
 

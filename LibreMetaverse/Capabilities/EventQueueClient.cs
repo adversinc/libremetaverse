@@ -31,6 +31,17 @@ using OpenMetaverse.StructuredData;
 
 namespace OpenMetaverse.Http
 {
+    public enum EventQueueError {
+        NotFoundOnRun,
+        NotFoundOnInit
+    }
+    
+    public class CapsErrorArgs {
+        public EventQueueError Error { get; set; }
+        public HttpWebRequest Request { get; set; }
+        public HttpWebResponse Response { get; set; }
+    }
+    
     public class EventQueueClient
     {
         private const string REQUEST_CONTENT_TYPE = "application/llsd+xml";
