@@ -47,7 +47,7 @@ namespace OpenMetaverse.Http
         private const string REQUEST_CONTENT_TYPE = "application/llsd+xml";
 
         /// <summary>Viewer defauls to 30 for main grid, 60 for others</summary>
-        public const int REQUEST_TIMEOUT = 60 * 1000;
+        public const int REQUEST_TIMEOUT = 30 * 1000;
 
         /// <summary>For exponential backoff on error.</summary>
         public const int REQUEST_BACKOFF_SECONDS = 15 * 1000; // 15 seconds start
