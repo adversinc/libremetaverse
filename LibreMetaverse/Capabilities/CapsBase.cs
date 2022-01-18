@@ -237,13 +237,13 @@ namespace OpenMetaverse.Http
                     // Write our data to the upload stream
                     uploadStream.Write(state.UploadData, 0, state.UploadData.Length);
                 }
-
+ 
                 // Start the request for the remote server response
                 IAsyncResult result = state.Request.BeginGetResponse(GetResponse, state);
                 // Register a timeout for the request
                 ThreadPool.RegisterWaitForSingleObject(result.AsyncWaitHandle, TimeoutCallback, state,
                     state.MillisecondsTimeout, true);
-            }
+            } 
             catch (Exception ex)
             {
                 //Logger.Log.Debug("CapsBase.OpenWrite(): " + ex.Message);
@@ -258,19 +258,16 @@ namespace OpenMetaverse.Http
             byte[] responseData = null;
             Exception error = null;
 
-            try
-            {
-                using (response = (HttpWebResponse)state.Request.EndGetResponse(ar))
-                {
+            try {
+                using(response = (HttpWebResponse) state.Request.EndGetResponse(ar)) {
                     // Get the stream for downloading the response
-                    using (var responseStream = response.GetResponseStream())
-                    {
+                    using(var responseStream = response.GetResponseStream()) {
                         #region Read the response
 
                         // If Content-Length is set we create a buffer of the exact size, otherwise
                         // a MemoryStream is used to receive the response
                         bool nolength = (response.ContentLength <= 0) || (Type.GetType("Mono.Runtime") != null);
-                        int size = (nolength) ? 8192 : (int)response.ContentLength;
+                        int size = (nolength) ? 8192 : (int) response.ContentLength;
                         MemoryStream ms = (nolength) ? new MemoryStream() : null;
                         byte[] buffer = new byte[size];
 
@@ -279,45 +276,38 @@ namespace OpenMetaverse.Http
                         int totalBytesRead = 0;
                         int totalSize = nolength ? 0 : size;
 
-                        while (responseStream != null && (bytesRead = responseStream.Read(buffer, offset, size)) != 0)
-                        {
+                        while(responseStream != null && (bytesRead = responseStream.Read(buffer, offset, size)) != 0) {
                             totalBytesRead += bytesRead;
 
-                            if (nolength)
-                            {
+                            if(nolength) {
                                 totalSize += (size - bytesRead);
                                 ms.Write(buffer, 0, bytesRead);
-                            }
-                            else
-                            {
+                            } else {
                                 offset += bytesRead;
                                 size -= bytesRead;
                             }
 
                             // Fire the download progress callback for each chunk of received data
-                            if (state.DownloadProgressCallback != null)
+                            if(state.DownloadProgressCallback != null)
                                 state.DownloadProgressCallback(state.Request, response, totalBytesRead, totalSize);
                         }
 
-                        if (nolength)
-                        {
+                        if(nolength) {
                             responseData = ms.ToArray();
                             ms.Close();
                             ms.Dispose();
-                        }
-                        else
-                        {
+                        } else {
                             responseData = buffer;
                         }
 
                         #endregion Read the response
                     }
                 }
-            }
-            catch (Exception ex)
-            {
+            } catch(Exception ex) {
                 // Logger.DebugLog("CapsBase.GetResponse(): " + ex.Message);
                 error = ex;
+            } finally {
+                response?.Close();
             }
 
             state.CompletedCallback?.Invoke(state.Request, response, responseData, error);
@@ -328,8 +318,8 @@ namespace OpenMetaverse.Http
             if (!timedOut) return;
 
             RequestState requestState = state as RequestState;
-            //Logger.Log.Debug("CapsBase.TimeoutCallback(): Request to " + requestState.Request.RequestUri +
-            //    " timed out after " + requestState.MillisecondsTimeout + " milliseconds");
+            //Logger.Log($"CapsBase.TimeoutCallback(): Request to {requestState.Request.RequestUri} "+
+            //    $" timed out after {requestState.MillisecondsTimeout}ms", Helpers.LogLevel.Warning);
             requestState?.Request?.Abort();
         }
     }
