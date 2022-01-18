@@ -685,6 +685,7 @@ namespace OpenMetaverse
             {
                 foreach (InventoryBase o in objects)
                 {
+                    // For non-folder entries proceed links by pulling their original items
                     if (o.GetType() != typeof(InventoryFolder))
                     {
                         InventoryItem ob = (InventoryItem)o;
@@ -704,6 +705,9 @@ namespace OpenMetaverse
                         {
                             cleaned_list.Add(ob);
                         }
+                    } else {
+                        // Add folders as is
+                        cleaned_list.Add(o);
                     }
                 }
             }
