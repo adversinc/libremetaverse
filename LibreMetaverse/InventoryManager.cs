@@ -685,6 +685,7 @@ namespace OpenMetaverse
             {
                 foreach (InventoryBase o in objects)
                 {
+                    // For non-folder entries proceed links by pulling their original items
                     if (o.GetType() != typeof(InventoryFolder))
                     {
                         InventoryItem ob = (InventoryItem)o;
@@ -704,6 +705,9 @@ namespace OpenMetaverse
                         {
                             cleaned_list.Add(ob);
                         }
+                    } else {
+                        // Add folders as is
+                        cleaned_list.Add(o);
                     }
                 }
             }
@@ -1449,8 +1453,17 @@ namespace OpenMetaverse
         /// <param name="item">The <seealso cref="UUID"/> of the inventory item to remove</param>
         public void RemoveItem(UUID item)
         {
-            List<UUID> items = new List<UUID>(1) { item };
-            Remove(items, null);
+            if (Client.AisClient.IsAvailable)
+            {
+                Client.AisClient.RemoveItem(item, RemoveLocalUi).ConfigureAwait(false);
+            }
+            else
+            {
+                List<UUID> items = new List<UUID>(1) { item };
+#pragma warning disable CS0612 // Type or member is obsolete
+                Remove(items, null);
+#pragma warning restore CS0612 // Type or member is obsolete
+            }
         }
 
         /// <summary>
@@ -1459,15 +1472,26 @@ namespace OpenMetaverse
         /// <param name="folder">The <seealso cref="UUID"/> of the folder to remove</param>
         public void RemoveFolder(UUID folder)
         {
-            List<UUID> folders = new List<UUID>(1) { folder };
-            Remove(null, folders);
+            if (Client.AisClient.IsAvailable)
+            {
+                Client.AisClient.RemoveCategory(folder, RemoveLocalUi).ConfigureAwait(false);
+            } 
+            else
+            {
+                List<UUID> folders = new List<UUID>(1) { folder };
+#pragma warning disable CS0612 // Type or member is obsolete
+                Remove(null, folders);
+#pragma warning restore CS0612 // Type or member is obsolete
+            }
         }
 
         /// <summary>
-        /// Remove multiple items or folders from inventory
+        /// Remove multiple items or folders from inventory. Note that this uses the LLUDP method
+        /// which Second Life has deprecated and removed.
         /// </summary>
         /// <param name="items">A List containing the <seealso cref="UUID"/>s of items to remove</param>
         /// <param name="folders">A List containing the <seealso cref="UUID"/>s of the folders to remove</param>
+        [Obsolete]
         public void Remove(List<UUID> items, List<UUID> folders)
         {
             if ((items == null || items.Count == 0) && (folders == null || folders.Count == 0))
@@ -1583,7 +1607,9 @@ namespace OpenMetaverse
                     }
                 }
 
+#pragma warning disable CS0612 // Type or member is obsolete
                 Remove(remItems, remFolders);
+#pragma warning restore CS0612 // Type or member is obsolete
             }
         }
         #endregion Remove
@@ -1854,7 +1880,7 @@ namespace OpenMetaverse
         public void CreateLink(UUID folderID, UUID itemID, string name, string description,
             AssetType assetType, InventoryType invType, UUID transactionID, ItemCreatedCallback callback)
         {
-            if (Client.AisClient.IsAvailable)
+            if (Client.Settings.USE_AIS_FOR_LINKS && Client.AisClient.IsAvailable)
             {
                 OSDArray links = new OSDArray();
                 OSDMap link = new OSDMap
@@ -2664,6 +2690,59 @@ namespace OpenMetaverse
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Send inventory acceptance message
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="ObjectID"></param>
+        /// <param name="FromAgentID"></param>
+        /// <param name="folder"></param>
+        /// <param name="IMSessionID"></param>
+        /// <param name="accept"></param>
+        public void AcceptInventoryOffer(InstantMessageDialog type, UUID ObjectID, UUID FromAgentID, UUID folder,
+            UUID IMSessionID, bool accept = true) {
+            ImprovedInstantMessagePacket imp = new ImprovedInstantMessagePacket();
+            imp.AgentData.AgentID = Client.Self.AgentID;
+            imp.AgentData.SessionID = Client.Self.SessionID;
+            imp.MessageBlock.FromGroup = false;
+            imp.MessageBlock.ToAgentID = FromAgentID;
+            imp.MessageBlock.Offline = 0;
+            imp.MessageBlock.ID = IMSessionID;
+            imp.MessageBlock.Timestamp = 0;
+            imp.MessageBlock.FromAgentName = Utils.StringToBytes(Client.Self.Name);
+            imp.MessageBlock.Message = Utils.EmptyBytes;
+            imp.MessageBlock.ParentEstateID = 0;
+            imp.MessageBlock.RegionID = UUID.Zero;
+            imp.MessageBlock.Position = Client.Self.SimPosition;
+
+            switch(type) {
+                case InstantMessageDialog.InventoryOffered:
+                    imp.MessageBlock.Dialog =
+                        accept
+                            ? (byte) InstantMessageDialog.InventoryAccepted
+                            : (byte) InstantMessageDialog.InventoryDeclined;
+                    break;
+                case InstantMessageDialog.TaskInventoryOffered:
+                    imp.MessageBlock.Dialog =
+                        accept
+                            ? (byte) InstantMessageDialog.TaskInventoryAccepted
+                            : (byte) InstantMessageDialog.TaskInventoryDeclined;
+                    break;
+                case InstantMessageDialog.GroupNotice:
+                    imp.MessageBlock.Dialog =
+                        accept
+                            ? (byte) InstantMessageDialog.GroupNoticeInventoryAccepted
+                            : (byte) InstantMessageDialog.GroupNoticeInventoryDeclined;
+                    break;
+            }
+
+            imp.MessageBlock.BinaryBucket = accept ? folder.GetBytes() : Utils.EmptyBytes;
+
+            Client.Network.SendPacket(imp, Client.Network.CurrentSim);
+
+            //OnInventoryOfferProcessed(new InventoryOfferProcessedArgs(type, ObjectID, FromAgentID, folder, accept));
         }
 
         #endregion Rez/Give

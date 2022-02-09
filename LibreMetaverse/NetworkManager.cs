@@ -300,6 +300,11 @@ namespace OpenMetaverse
             remove { lock (m_EventQueueRunningLock) { m_EventQueueRunning -= value; } }
         }
 
+        /// <summary>
+        /// Fires when something happens with our Caps
+        /// </summary>
+        public event Caps.CapsErrorCallback CapsError;
+
         #endregion Delegates
 
         #region Properties
@@ -564,6 +569,10 @@ namespace OpenMetaverse
                 // We're not tracking this sim, create a new Simulator object
                 simulator = new Simulator(Client, endPoint, handle);
 
+                simulator.CapsError += (sender, e) => {
+                    CapsError?.Invoke(sender, e);
+                };
+
                 // Immediately add this simulator to the list of current sims. It will be removed if the
                 // connection fails
                 lock (Simulators) Simulators.Add(simulator);
@@ -821,46 +830,66 @@ namespace OpenMetaverse
             // Send a CloseCircuit packet to simulators if we are initiating the disconnect
             bool sendCloseCircuit = (type == DisconnectType.ClientInitiated || type == DisconnectType.NetworkTimeout);
 
-            lock (Simulators)
-            {
-                // Disconnect all simulators except the current one
-                foreach (Simulator t in Simulators)
-                {
-                    if (t != null && t != CurrentSim)
-                    {
-                        t.Disconnect(sendCloseCircuit);
+            int debugStep = 0;
 
-                        // Fire the SimDisconnected event if a handler is registered
-                        if (m_SimDisconnected != null)
-                        {
-                            OnSimDisconnected(new SimDisconnectedEventArgs(t, type));
+            try {
+                debugStep++;
+                lock(Simulators) {
+                    // Disconnect all simulators except the current one
+                    foreach(Simulator t in Simulators) {
+                        if(t != null && t != CurrentSim) {
+                            t.Disconnect(sendCloseCircuit);
+
+                            // Fire the SimDisconnected event if a handler is registered
+                            if(m_SimDisconnected != null) {
+                                OnSimDisconnected(new SimDisconnectedEventArgs(t, type));
+                            }
                         }
                     }
-                }
 
-                Simulators.Clear();
+                    debugStep++;
+                    Simulators.Clear();
+                }
+            } catch(Exception ex) {
+                Logger.Log($"EXCEPTION in NetworkManager.Shutdown ({debugStep}): {ex.Message}", Helpers.LogLevel.Error, Client);
             }
 
-            if (CurrentSim != null)
-            {
-                // Kill the connection to the curent simulator
-                CurrentSim.Disconnect(sendCloseCircuit);
+            debugStep = 10;
+            try {
+                if(CurrentSim != null) {
+                    // Kill the connection to the curent simulator
+                    CurrentSim.Disconnect(sendCloseCircuit);
 
-                // Fire the SimDisconnected event if a handler is registered
-                if (m_SimDisconnected != null)
-                {
-                    OnSimDisconnected(new SimDisconnectedEventArgs(CurrentSim, type));
+                    // Fire the SimDisconnected event if a handler is registered
+                    if(m_SimDisconnected != null) {
+                        OnSimDisconnected(new SimDisconnectedEventArgs(CurrentSim, type));
+                    }
                 }
+            } catch(Exception ex) {
+                Logger.Log($"EXCEPTION in NetworkManager.Shutdown ({debugStep}): {ex.Message}", Helpers.LogLevel.Error,
+                    Client);
             }
-            
-            _packetInbox.Writer.Complete();
-            _packetOutbox.Writer.Complete();
 
-            _packetInbox = null;
-            _packetOutbox = null;
-            
-            Interlocked.Exchange(ref _packetInboxCount, 0);
-            Interlocked.Exchange(ref _packetOutboxCount, 0);
+            debugStep = 20;
+            try {
+                _packetInbox?.Writer?.Complete();
+                _packetOutbox?.Writer?.Complete();
+
+                _packetInbox = null;
+                _packetOutbox = null;
+            } catch(Exception ex) {
+                Logger.Log($"EXCEPTION in NetworkManager.Shutdown ({debugStep}): {ex.Message}", Helpers.LogLevel.Error,
+                    Client);
+            }
+
+            debugStep = 30;
+            try {
+                Interlocked.Exchange(ref _packetInboxCount, 0);
+                Interlocked.Exchange(ref _packetOutboxCount, 0);
+            } catch(Exception ex) {
+                Logger.Log($"EXCEPTION in NetworkManager.Shutdown ({debugStep}): {ex.Message}", Helpers.LogLevel.Error,
+                    Client);
+            }
 
             Connected = false;
 

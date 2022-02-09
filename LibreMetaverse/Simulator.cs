@@ -31,6 +31,7 @@ using System.Linq;
 using System.Threading;
 using System.Net;
 using OpenMetaverse.Packets;
+using XmlRpcCore;
 
 namespace OpenMetaverse
 {
@@ -444,6 +445,11 @@ namespace OpenMetaverse
         /// </summary>
         public bool AgentMovementComplete;
 
+        /// <summary>
+        /// Fires when something happens with our Caps
+        /// </summary>
+        public event Caps.CapsErrorCallback CapsError;
+
         #endregion Public Members
 
         #region Properties
@@ -512,6 +518,9 @@ namespace OpenMetaverse
 
 
         private ManualResetEvent GotUseCircuitCodeAck = new ManualResetEvent(false);
+        private long LastPacketDebug;
+        private long LastPacketTime;
+
         #endregion Internal/Private Members
 
         /// <summary>
@@ -563,6 +572,10 @@ namespace OpenMetaverse
 
             // Force all the CAPS connections closed for this simulator
             Caps?.Disconnect(true);
+        }
+
+        protected override void LogDebug(string str, Helpers.LogLevel level) {
+            Logger.Log(str, level, Client);
         }
 
         /// <summary>
@@ -693,9 +706,13 @@ namespace OpenMetaverse
             if (Client.Settings.ENABLE_CAPS)
             {
                 // Connect to the new CAPS system
-                if (!String.IsNullOrEmpty(seedcaps))
+                if(!String.IsNullOrEmpty(seedcaps)) {
                     Caps = new Caps(this, seedcaps);
-                else
+
+                    Caps.CapsError += (sender, e) => {
+                        CapsError?.Invoke(sender, e);
+                    };
+                }  else
                     Logger.Log("Setting up a sim without a valid capabilities server!", Helpers.LogLevel.Error, Client);
             }
 
@@ -1060,6 +1077,21 @@ namespace OpenMetaverse
                     ((IPEndPoint)buffer.RemoteEndPoint), Helpers.LogLevel.Warning, Client);
                 return;
             }
+            
+            long epoch = (DateTime.UtcNow.Ticks - 621355968000000000) / 10000000;
+            if(LastPacketDebug < epoch - 10) {
+                LastPacketDebug = epoch;
+                //Logger.Log(
+                //   $"Received packet from {((IPEndPoint) buffer.RemoteEndPoint)} ({epoch - LastPacketTime}s since last packet)",
+                //Helpers.LogLevel.Debug, Client);
+
+                if(LastPacketTime > 0 && epoch - LastPacketTime > 20) {
+                    Logger.Log($"Packets from {((IPEndPoint) buffer.RemoteEndPoint)} were missing for {epoch - LastPacketTime} seconds",
+                    Helpers.LogLevel.Error, Client);
+                }
+            }
+
+            LastPacketTime = epoch;
 
             // Update the disconnect flag so this sim doesn't time out
             DisconnectCandidate = false;

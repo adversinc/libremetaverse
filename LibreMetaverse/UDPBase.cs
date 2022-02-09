@@ -30,6 +30,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.ObjectPool;
+using XmlRpcCore;
 
 namespace OpenMetaverse
 {
@@ -58,6 +59,12 @@ namespace OpenMetaverse
         // Packet pool for default sized packets
         private readonly ObjectPool<UDPPacketBuffer> _packetPool =
             new DefaultObjectPool<UDPPacketBuffer>(new DefaultPooledObjectPolicy<UDPPacketBuffer>());
+
+        private long MaxReceiveTime;
+        private long LastPacketTime;
+        private long LastPacketDebug;
+        private int BiggestPacket;
+        private int NumPackets;
 
         /// <summary>
         /// Initialize the UDP packet handler in server mode
@@ -113,6 +120,7 @@ namespace OpenMetaverse
             udpSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, false);
 
             udpSocket.Bind(ipep);
+            //Logger.Log($"UDP port opened: {(udpSocket.LocalEndPoint as IPEndPoint).Port}", Helpers.LogLevel.Debug);
 
             // we're not shutting down, we're starting up
             shutdownFlag = false;
@@ -135,6 +143,10 @@ namespace OpenMetaverse
             // threads.  Once we have the lock, we set shutdownFlag to inform the other
             // threads that the socket is closed.
             shutdownFlag = true;
+
+            //var port = (udpSocket?.LocalEndPoint as IPEndPoint)?.Port ?? -1;
+            //Logger.Log($"UDP port closed: {port}", 
+            //    Helpers.LogLevel.Debug);
             udpSocket.Close();
         }
 
@@ -152,6 +164,9 @@ namespace OpenMetaverse
 
             try
             {
+                udpSocket.SendTimeout = 1;
+                udpSocket.ReceiveTimeout = 1;
+                
                 // kick off an async read
                 udpSocket.BeginReceiveFrom(
                     buf.Data,
@@ -213,7 +228,32 @@ namespace OpenMetaverse
             {
                 // get the length of data actually read from the socket, store it with the
                 // buffer
+                var start = Now();
                 buffer.DataLength = udpSocket.EndReceiveFrom(iar, ref buffer.RemoteEndPoint);
+                var now = Now();
+                if(now - start > MaxReceiveTime) {
+                    MaxReceiveTime = now - start;
+                }
+
+                if(buffer.DataLength > BiggestPacket) {
+                    BiggestPacket = buffer.DataLength;
+                }
+
+                if(LastPacketDebug < now - 10*1000) {
+                    LastPacketDebug = now;
+                    
+                    if(LastPacketTime > 0 && now - LastPacketTime > 20*1000) {
+                        LogDebug(
+                            $"[UDPBase] Packets from {((IPEndPoint) buffer.RemoteEndPoint)} were missing for {now - LastPacketTime} seconds",
+                        Helpers.LogLevel.Error);
+                    }
+
+                    BiggestPacket = 0;
+                    NumPackets = 0;
+                }
+
+                NumPackets++;
+                LastPacketTime = now;
 
                 // call the abstract method PacketReceived(), passing the buffer that
                 // has just been filled from the socket read.
@@ -222,6 +262,9 @@ namespace OpenMetaverse
             catch (SocketException) { }
             catch (ObjectDisposedException) { }
             finally { _packetPool.Return(buffer); }
+        }
+
+        protected virtual void LogDebug(string str, Helpers.LogLevel level) {
         }
 
         public void AsyncBeginSend(UDPPacketBuffer buf)
@@ -264,5 +307,9 @@ namespace OpenMetaverse
         //    catch (SocketException) { }
         //    catch (ObjectDisposedException) { }
         //}
+
+        long Now() {
+           return (DateTime.UtcNow.Ticks - 621355968000000000) / 10000;
+        }
     }
 }
