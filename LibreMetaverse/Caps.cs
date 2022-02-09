@@ -294,6 +294,7 @@ namespace OpenMetaverse
                     _EventQueueCap.Start();
                 }
 
+                Caps404Count = 0;
                 OnCapabilitiesReceived(Simulator);
             }
             else if (
@@ -303,18 +304,27 @@ namespace OpenMetaverse
                 ((HttpWebResponse)exception.Response).StatusCode == HttpStatusCode.NotFound)
             {
                 // 404 error
-                Logger.Log("Seed capability returned a 404, capability system is aborting",
-                    Helpers.LogLevel.Error);
+                Caps404Count++;
+                
+                if(Caps404Count > 3) {
+                    Logger.Log("Seed capability returned a 404, capability system is aborting",
+                        Helpers.LogLevel.Error);
 
-                var response = (HttpWebResponse) ((WebException) error).Response;
-                try {
-                    var args = new CapsErrorArgs {
-                        Response = response,
-                        Error = EventQueueError.NotFoundOnInit
-                    };
-                    CapsError?.Invoke(this, args);
-                } catch(Exception ex) {
-                    Logger.Log($"CapsError callback error: {ex.Message}", Helpers.LogLevel.Error, ex);
+                    var response = (HttpWebResponse) ((WebException) error).Response;
+                    try {
+                        var args = new CapsErrorArgs {
+                            Response = response,
+                            Error = EventQueueError.NotFoundOnInit
+                        };
+                        CapsError?.Invoke(this, args);
+                    } catch(Exception ex) {
+                        Logger.Log($"CapsError callback error: {ex.Message}", Helpers.LogLevel.Error, ex);
+                    }
+
+                } else {
+                    Logger.Log($"Seed capability returned a 404 (try {Caps404Count}), retrying", Helpers.LogLevel.Error);
+                    Thread.Sleep(3*1000);
+                    MakeSeedRequest();
                 }
             }
             else
