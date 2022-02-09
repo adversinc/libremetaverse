@@ -1858,7 +1858,7 @@ namespace OpenMetaverse
         public void CreateLink(UUID folderID, UUID itemID, string name, string description,
             AssetType assetType, InventoryType invType, UUID transactionID, ItemCreatedCallback callback)
         {
-            if (Client.AisClient.IsAvailable)
+            if (Client.Settings.USE_AIS_FOR_LINKS && Client.AisClient.IsAvailable)
             {
                 OSDArray links = new OSDArray();
                 OSDMap link = new OSDMap

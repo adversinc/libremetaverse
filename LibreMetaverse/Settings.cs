@@ -84,6 +84,11 @@ namespace OpenMetaverse
         /// </summary>
         public const bool ENABLE_LIBRARY_STORE = true;
 
+        /// <summary>
+        /// Use AIS capabilities to create links
+        /// </summary>
+        public bool USE_AIS_FOR_LINKS = true;
+
         #endregion
 
         #region Timeouts and Intervals
