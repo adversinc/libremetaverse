@@ -323,7 +323,7 @@ namespace OpenMetaverse
 
                 } else {
                     Logger.Log($"Seed capability returned a 404 (try {Caps404Count}), retrying", Helpers.LogLevel.Error);
-                    Thread.Sleep(3*1000);
+                    Thread.Sleep(1*1000);
                     MakeSeedRequest();
                 }
             }
