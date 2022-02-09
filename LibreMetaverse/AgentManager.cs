@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2006-2016, openmetaverse.co
- * Copyright (c) 2019-2021, Sjofn LLC
+ * Copyright (c) 2019-2022, Sjofn LLC
  * All rights reserved.
  *
  * - Redistribution and use in source and binary forms, with or without 
@@ -2509,8 +2509,8 @@ namespace OpenMetaverse
         /// </summary>
         /// <param name="objectLocalID">The Objects Simulator Local ID</param>
         /// <seealso cref="Simulator.ObjectsPrimitives"/>
-        /// <seealso cref="Grab"/>
-        /// <seealso cref="GrabUpdate"/>
+        /// <seealso cref="AgentManager.Grab"/>
+        /// <seealso cref="AgentManager.GrabUpdate"/>
         public void DeGrab(uint objectLocalID)
         {
             DeGrab(objectLocalID, TOUCH_INVALID_TEXCOORD, TOUCH_INVALID_TEXCOORD, 
