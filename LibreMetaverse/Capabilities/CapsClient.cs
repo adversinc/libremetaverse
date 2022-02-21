@@ -51,6 +51,7 @@ namespace OpenMetaverse.Http
         protected HttpWebRequest _Request;
         protected OSD _Response;
         protected AutoResetEvent _ResponseEvent = new AutoResetEvent(false);
+        private DateTime _RequestTime;
 
         #region Constructors
 
@@ -130,6 +131,8 @@ namespace OpenMetaverse.Http
         {
             _PostData = postData;
             _ContentType = contentType;
+
+            _RequestTime = DateTime.UtcNow;
 
             if (_Request != null)
             {
@@ -289,11 +292,76 @@ namespace OpenMetaverse.Http
 
             OSD result = null;
 
+            string post = "";
+            try { 
+                post = System.Text.Encoding.UTF8.GetString(_PostData);
+            } catch { }
+            /*
+            var resp = responseData != null ? System.Text.Encoding.UTF8.GetString(responseData) : "null";
+            */
+
             if (responseData != null)
             {
-                try { result = OSDParser.Deserialize(responseData); }
-                catch (Exception ex) { error = ex; }
+                try { result = OSDParser.Deserialize(responseData); } 
+                catch(Exception ex) {
+                    error = ex;
+
+                    string fname = string.Join("-", "osderror",
+                        System.Diagnostics.Process.GetCurrentProcess().Id.ToString(), DateTime.UtcNow.ToString("u"));
+
+                    /*
+                    string txt = "!!!";
+                    try {
+                        txt = _RequestTime.ToString("u") + "\n" + request.RequestUri.ToString() + "\n" +
+                              "Content-Length: " + request.ContentLength.ToString() + "\n" + post + "\n\n" +
+                              DateTime.Now.ToString("u") + "\n" + "X-LL-Request-Id: " +
+                              response.Headers["X-LL-Request-Id"] + "\n" +
+                              $"raw size: {resp.Length}, decoded: {result?.ToString().Length}" + "\n" + "\n" + resp;
+                    } catch { }
+
+                    System.IO.File.WriteAllText($"../../slbots_logs/debug/caps/{fname}", txt);
+                    */
+                }
             }
+
+            // DEBUG: log group caps to file
+            try {
+                OSDMap res = (OSDMap) result;
+                if(res["group_id"].ToString() != "undef") {
+                    var groupID = res["group_id"].ToString();
+
+                    bool ignore = !post.Contains(groupID);
+
+                    /*
+                    string member_count = "??????";
+                    try {
+                        member_count = res["member_count"];
+                        while(member_count.Length < 6) {
+                            member_count = "0" + member_count;
+                        }
+                    } catch { }
+
+                    string fname = string.Join("-", groupID.ToString().Substring(0,8), ignore ? "brkn" : "okay",
+                        //System.Diagnostics.Process.GetCurrentProcess().Id.ToString(),
+                        member_count,
+                        DateTime.UtcNow.ToString("u"));
+
+                    if(true) {
+                        System.IO.File.WriteAllText($"../../slbots_logs/debug/caps/{fname}",
+                            _RequestTime.ToString("u") + "\n" + request.RequestUri.ToString() + "\n" +
+                            "Content-Length: " + request.ContentLength.ToString() + "\n" + post + "\n\n" +
+                            (ignore ? "IGNORED (UUID mismatch)\n\n" : "") + DateTime.Now.ToString("u") + "\n" +
+                            "X-LL-Request-Id: " + response.Headers["X-LL-Request-Id"] + "\n" +
+                            $"raw size: {resp.Length}, decoded: {result?.ToString().Length}" + "\n" + "\n" +
+                            result?.ToString() + "\n\n" + resp);
+                    }
+                    */
+
+                    if(ignore) {
+                        OnComplete = null;
+                    }
+                }
+            } catch { }
 
             FireCompleteCallback(result, error);
         }

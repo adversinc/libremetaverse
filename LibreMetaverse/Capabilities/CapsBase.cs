@@ -257,60 +257,66 @@ namespace OpenMetaverse.Http
             HttpWebResponse response = null;
             byte[] responseData = null;
             Exception error = null;
+            
+            // We can not use using() pattern here because we need to pass response to the callback
+            // before response is disposed. Thus, we dispose it manually
 
             try {
-                using(response = (HttpWebResponse) state.Request.EndGetResponse(ar)) {
-                    // Get the stream for downloading the response
-                    using(var responseStream = response.GetResponseStream()) {
-                        #region Read the response
+                response = (HttpWebResponse) state.Request.EndGetResponse(ar);
+                // Get the stream for downloading the response
+                using(var responseStream = response.GetResponseStream()) {
+                    #region Read the response
 
-                        // If Content-Length is set we create a buffer of the exact size, otherwise
-                        // a MemoryStream is used to receive the response
-                        bool nolength = (response.ContentLength <= 0) || (Type.GetType("Mono.Runtime") != null);
-                        int size = (nolength) ? 8192 : (int) response.ContentLength;
-                        MemoryStream ms = (nolength) ? new MemoryStream() : null;
-                        byte[] buffer = new byte[size];
+                    // If Content-Length is set we create a buffer of the exact size, otherwise
+                    // a MemoryStream is used to receive the response
+                    bool nolength = (response.ContentLength <= 0) || (Type.GetType("Mono.Runtime") != null);
+                    int size = (nolength) ? 8192 : (int) response.ContentLength;
+                    MemoryStream ms = (nolength) ? new MemoryStream() : null;
+                    byte[] buffer = new byte[size];
 
-                        int bytesRead = 0;
-                        int offset = 0;
-                        int totalBytesRead = 0;
-                        int totalSize = nolength ? 0 : size;
+                    int bytesRead = 0;
+                    int offset = 0;
+                    int totalBytesRead = 0;
+                    int totalSize = nolength ? 0 : size;
 
-                        while(responseStream != null && (bytesRead = responseStream.Read(buffer, offset, size)) != 0) {
-                            totalBytesRead += bytesRead;
-
-                            if(nolength) {
-                                totalSize += (size - bytesRead);
-                                ms.Write(buffer, 0, bytesRead);
-                            } else {
-                                offset += bytesRead;
-                                size -= bytesRead;
-                            }
-
-                            // Fire the download progress callback for each chunk of received data
-                            if(state.DownloadProgressCallback != null)
-                                state.DownloadProgressCallback(state.Request, response, totalBytesRead, totalSize);
-                        }
+                    while(responseStream != null && (bytesRead = responseStream.Read(buffer, offset, size)) != 0) {
+                        totalBytesRead += bytesRead;
 
                         if(nolength) {
-                            responseData = ms.ToArray();
-                            ms.Close();
-                            ms.Dispose();
+                            totalSize += (size - bytesRead);
+                            ms.Write(buffer, 0, bytesRead);
                         } else {
-                            responseData = buffer;
+                            offset += bytesRead;
+                            size -= bytesRead;
                         }
 
-                        #endregion Read the response
+                        // Fire the download progress callback for each chunk of received data
+                        if(state.DownloadProgressCallback != null)
+                            state.DownloadProgressCallback(state.Request, response, totalBytesRead, totalSize);
                     }
+
+                    if(nolength) {
+                        responseData = ms.ToArray();
+                        ms.Close();
+                        ms.Dispose();
+                    } else {
+                        responseData = buffer;
+                    }
+
+                    #endregion Read the response
                 }
             } catch(Exception ex) {
                 // Logger.DebugLog("CapsBase.GetResponse(): " + ex.Message);
                 error = ex;
-            } finally {
-                response?.Close();
             }
 
-            state.CompletedCallback?.Invoke(state.Request, response, responseData, error);
+            try {
+                state.CompletedCallback?.Invoke(state.Request, response, responseData, error);
+            } finally {
+                response?.Dispose();
+            }
+
+            //state.CompletedCallback?.Invoke(state.Request, response, responseData, error);
         }
 
         private static void TimeoutCallback(object state, bool timedOut)
