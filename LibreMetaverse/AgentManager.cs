@@ -734,6 +734,38 @@ namespace OpenMetaverse
         public string Name;
         /// <summary>Mute flags</summary>
         public MuteFlags Flags;
+
+        /// <summary>
+        /// Checks if sender is muted (presents in MuteList)
+        /// </summary>
+        /// <param name="messageType">The type of the message. The call is being performed for various
+        /// message types (IMs, chat, scripts...) so the message type is passed as string here.</param>
+        /// <param name="senderUuid">The sender UUID (resident or object)</param>
+        /// <param name="senderName">The sender's name</param>
+        /// <param name="ownerUuid">The owner of the sender (for objects and scripts). May be null if no UUID available</param>
+        /// <param name="ownerName">The name of the owner</param>
+        /// <returns></returns>
+        public bool IsMutesMessage(string messageType, UUID senderUuid, string senderName, UUID? ownerUuid = null,
+            string ownerName = "") {
+            return
+                // Check exact UUID match
+                IsNameOrUUIDMatches(ID, Name, senderUuid, senderName) ||
+                // Check the owner match
+                IsNameOrUUIDMatches(ID, Name, ownerUuid, ownerName);
+        }
+
+        /// <summary>
+        /// Returns true if either UUID or name of the second pair matches the name/UUID of the second pair
+        /// </summary>
+        /// <returns></returns>
+        private static bool IsNameOrUUIDMatches(UUID u1, string n1, UUID? u2, string n2) {
+            if(u1 != UUID.Zero && u1 == u2) { return true; }
+
+            // u2 == null means "any u1"
+            if((u1 == UUID.Zero || u2 == null) && n1 != "" && n1.ToLower() == n2.ToLower()) { return true; }
+
+            return false;
+        }
     }
 
     /// <summary>Transaction detail sent with MoneyBalanceReply message</summary>
@@ -3932,21 +3964,25 @@ namespace OpenMetaverse
                 message.Offline = (InstantMessageOnline)im.MessageBlock.Offline;
                 message.BinaryBucket = im.MessageBlock.BinaryBucket;
 
-                if(message.Dialog == InstantMessageDialog.GroupNotice) {
-	                try {
-		                int i = 0;
-		                message.HasAttachment = message.BinaryBucket[i++] > 0;
-		                message.AttachmentType = (AssetType) message.BinaryBucket[i++];
+                // Actually discard muted people and objects
+                if(!IsSenderMuted(message.Dialog.ToString(), message.FromAgentID, message.FromAgentName)) {
+                    if(message.Dialog == InstantMessageDialog.GroupNotice) {
+                        try {
+                            int i = 0;
+                            message.HasAttachment = message.BinaryBucket[i++] > 0;
+                            message.AttachmentType = (AssetType) message.BinaryBucket[i++];
 
-		                message.GroupUUID.FromBytes(message.BinaryBucket, i);
-	                } catch {
-		                message.HasAttachment = false;
-	                }
+                            message.GroupUUID.FromBytes(message.BinaryBucket, i);
+                        } catch {
+                            message.HasAttachment = false;
+                        }
+                    }
+
+                    OnInstantMessage(new InstantMessageEventArgs(message, simulator));
                 }
-
-                OnInstantMessage(new InstantMessageEventArgs(message, simulator));
             }
         }
+        
 
         protected void OfflineMessageHandlerCallback(CapsClient client, OSD response, Exception error)
         {
@@ -3994,10 +4030,15 @@ namespace OpenMetaverse
                         ? msg["binary_bucket"].AsBinary() : new byte[] { 0 };
                     message.GroupIM = msg.ContainsKey("from_group") && msg["from_group"].AsBoolean();
 
-                    OnInstantMessage(new InstantMessageEventArgs(message, null));
+
+                    // Discard muted people and objects
+                    if(!IsSenderMuted(message.Dialog.ToString(), message.FromAgentID, message.FromAgentName)) {
+                        OnInstantMessage(new InstantMessageEventArgs(message, null));
+                    }
                 }                
             }
         }
+        
 
         /// <summary>
         /// Take an incoming Chat packet, auto-parse, and if OnChat is defined call 
@@ -4012,14 +4053,18 @@ namespace OpenMetaverse
 
             ChatFromSimulatorPacket chat = (ChatFromSimulatorPacket)packet;
 
-            OnChat(new ChatEventArgs(e.Simulator, Utils.BytesToString(chat.ChatData.Message),
-                (ChatAudibleLevel)chat.ChatData.Audible,
-                (ChatType)chat.ChatData.ChatType,
-                (ChatSourceType)chat.ChatData.SourceType,
-                Utils.BytesToString(chat.ChatData.FromName),
-                chat.ChatData.SourceID,
-                chat.ChatData.OwnerID,
-                chat.ChatData.Position));
+            // Discard muted people and objects
+            string fromName = Utils.BytesToString(chat.ChatData.FromName);
+            if(!IsSenderMuted("Chat", chat.ChatData.OwnerID, fromName)) {
+                OnChat(new ChatEventArgs(e.Simulator, Utils.BytesToString(chat.ChatData.Message),
+                    (ChatAudibleLevel)chat.ChatData.Audible,
+                    (ChatType)chat.ChatData.ChatType,
+                    (ChatSourceType)chat.ChatData.SourceType, 
+                    fromName,
+                    chat.ChatData.SourceID,
+                    chat.ChatData.OwnerID,
+                    chat.ChatData.Position));
+            }
         }
 
         /// <summary>
@@ -4042,15 +4087,21 @@ namespace OpenMetaverse
                 ownerID = dialog.OwnerData[0].OwnerID;
             }
 
-            OnScriptDialog(new ScriptDialogEventArgs(Utils.BytesToString(dialog.Data.Message),
-                Utils.BytesToString(dialog.Data.ObjectName),
-                dialog.Data.ImageID,
-                dialog.Data.ObjectID,
-                Utils.BytesToString(dialog.Data.FirstName),
-                Utils.BytesToString(dialog.Data.LastName),
-                dialog.Data.ChatChannel,
-                buttons,
-                ownerID));
+            // Discard muted people and objects
+            string fromName = Utils.BytesToString(dialog.Data.ObjectName);  
+            string ownerName = Utils.BytesToString(dialog.Data.FirstName) + " " +
+                Utils.BytesToString(dialog.Data.LastName);
+            if(!IsSenderMuted("ScriptDialog", dialog.Data.ObjectID, fromName, null, ownerName)) {
+                OnScriptDialog(new ScriptDialogEventArgs(Utils.BytesToString(dialog.Data.Message),
+                    fromName,
+                    dialog.Data.ImageID,
+                    dialog.Data.ObjectID,
+                    Utils.BytesToString(dialog.Data.FirstName),
+                    Utils.BytesToString(dialog.Data.LastName),
+                    dialog.Data.ChatChannel,
+                    buttons,
+                    ownerID));
+            }
         }
 
         /// <summary>
@@ -4066,12 +4117,17 @@ namespace OpenMetaverse
 
             ScriptQuestionPacket question = (ScriptQuestionPacket)packet;
 
-            OnScriptQuestion(new ScriptQuestionEventArgs(simulator,
-                question.Data.TaskID,
-                question.Data.ItemID,
-                Utils.BytesToString(question.Data.ObjectName),
-                Utils.BytesToString(question.Data.ObjectOwner),
-                (ScriptPermission)question.Data.Questions));
+            // Discard muted people and objects
+            string fromName = Utils.BytesToString(question.Data.ObjectName);
+            string ownerName = Utils.BytesToString(question.Data.ObjectOwner);
+            if(!IsSenderMuted("ScriptQuestion", question.Data.ItemID, fromName, null, ownerName)) {
+                OnScriptQuestion(new ScriptQuestionEventArgs(simulator,
+                    question.Data.TaskID,
+                    question.Data.ItemID,
+                    fromName,
+                    ownerName,
+                    (ScriptPermission)question.Data.Questions));
+            }
         }
 
         /// <summary>
@@ -4105,15 +4161,43 @@ namespace OpenMetaverse
 
             LoadURLPacket loadURL = (LoadURLPacket)packet;
 
-            OnLoadURL(new LoadUrlEventArgs(
-                Utils.BytesToString(loadURL.Data.ObjectName),
-                loadURL.Data.ObjectID,
-                loadURL.Data.OwnerID,
-                loadURL.Data.OwnerIsGroup,
-                Utils.BytesToString(loadURL.Data.Message),
-                Utils.BytesToString(loadURL.Data.URL)
-            ));
+            // Discard muted people and objects
+            string fromName = Utils.BytesToString(loadURL.Data.ObjectName);
+            if(!IsSenderMuted("LoadURL", loadURL.Data.ObjectID, fromName)) {
+                OnLoadURL(new LoadUrlEventArgs(
+                    fromName,
+                    loadURL.Data.ObjectID,
+                    loadURL.Data.OwnerID,
+                    loadURL.Data.OwnerIsGroup,
+                    Utils.BytesToString(loadURL.Data.Message),
+                    Utils.BytesToString(loadURL.Data.URL)
+                ));
+            }
         }
+
+
+        /// <summary>
+        /// Checks if sender is muted (presents in MuteList)
+        /// </summary>
+        /// <param name="messageType">The type of the message. The call is being performed for various
+        /// message types (IMs, chat, scripts...) so the message type is passed as string here.</param>
+        /// <param name="senderUuid">The sender UUID (resident or object)</param>
+        /// <param name="senderName">The sender's name</param>
+        /// <param name="ownerUuid">The owner of the sender (for objects and scripts). May be null if no UUID available</param>
+        /// <param name="ownerName">The name of the owner</param>
+        /// <returns></returns>
+        private bool IsSenderMuted(string messageType, UUID senderUuid, string senderName, UUID? ownerUuid = null, string ownerName = "") {
+            var muted = false;
+            
+            MuteList.ForEach((MuteEntry entry) => {
+                if(entry.IsMutesMessage(messageType, senderUuid, senderName, ownerUuid, ownerName)) {
+                    muted = true;
+                }
+            });
+
+            return muted;
+        }
+        
 
         /// <summary>
         /// Update client's Position, LookAt and region handle from incoming packet
