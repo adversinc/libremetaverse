@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2006-2016, openmetaverse.co
- * Copyright (c) 2021, Sjofn LLC.
+ * Copyright (c) 2021-2022, Sjofn LLC.
  * All rights reserved.
  *
  * - Redistribution and use in source and binary forms, with or without
@@ -59,8 +59,8 @@ namespace LibreMetaverse.Tests
         {
             var fullusername = Environment.GetEnvironmentVariable("LMVTestAgentUsername");
             var password = Environment.GetEnvironmentVariable("LMVTestAgentPassword");
-            Assert.IsFalse(string.IsNullOrWhiteSpace(fullusername), "LMVTestAgentUsername is empty. Live NetworkTests cannot be performed.");
-            Assert.IsFalse(string.IsNullOrWhiteSpace(password), "LMVTestAgentPassword is empty. Live NetworkTests cannot be performed.");
+            if (string.IsNullOrWhiteSpace(fullusername)) { Assert.Ignore("LMVTestAgentUsername is empty. Live GridManagerTests cannot be performed."); }
+            if (string.IsNullOrWhiteSpace(password)) { Assert.Ignore("LMVTestAgentPassword is empty. Live GridManagerTests cannot be performed."); }
             var username = fullusername.Split(' ');
 
             Console.Write($"Logging in {fullusername}...");

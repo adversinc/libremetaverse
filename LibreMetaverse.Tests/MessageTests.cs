@@ -1,6 +1,6 @@
 ﻿/*
  * Copyright (c) 2006-2016, openmetaverse.co
- * Copyright (c) 2021, Sjofn LLC
+ * Copyright (c) 2021-2022, Sjofn LLC
  * All rights reserved.
  *
  * - Redistribution and use in source and binary forms, with or without
@@ -1160,6 +1160,59 @@ namespace LibreMetaverse.Tests
                 Assert.AreEqual(s.QueryReplies[i].SalePrice, t.QueryReplies[i].SalePrice);
             }
         }
+        
+        #region Mute List tests
+
+        [Test]
+        public void MuteListChecks() {
+            var avName = "Av1 Resident";
+            var avUuid = UUID.Random();
+            var objName = "The object name";
+            var objUuid = UUID.Random();
+            
+            var muteentry = new MuteEntry() {
+                ID = avUuid,
+                Name = avName
+            };
+            var muteentryCommon = new MuteEntry() {
+                ID = UUID.Zero,
+                Name = avName
+            };
+            var muteentryObject = new MuteEntry() {
+                ID = objUuid,
+                Name = objName
+            };
+            var muteentryObjectCommon = new MuteEntry() {
+                ID = UUID.Zero,
+                Name = objName
+            };
+
+            #region MessageFromAgent
+            Assert.IsTrue(muteentry.IsMutesMessage("MessageFromAgent", avUuid, "Some name"));
+            // Mute entry with a Zero UUID should match the name only
+            Assert.IsTrue(muteentryCommon.IsMutesMessage("MessageFromAgent", UUID.Random(), avName));
+            
+            Assert.IsFalse(muteentry.IsMutesMessage("MessageFromAgent", UUID.Random(), "Some name"));
+            // Mute entry with a specific UUID should not match the name only
+            Assert.IsFalse(muteentry.IsMutesMessage("MessageFromAgent", UUID.Random(), avName));
+            #endregion
+
+            #region ScriptQuestion
+            // Mutes by object UUID
+            Assert.IsTrue(muteentryObject.IsMutesMessage("ScriptQuestion", objUuid, "Some object", null,
+                "Some Resident"));
+            // Mutes by object's name
+            Assert.IsTrue(muteentryObjectCommon.IsMutesMessage("ScriptQuestion", UUID.Random(), objName, null,
+                "Some Resident"));
+            
+            // Mutes by sender's name
+            Assert.IsTrue(muteentry.IsMutesMessage("ScriptQuestion", UUID.Random(), "Some object", null,
+                avName));
+            #endregion
+        }
+
+        #endregion
+        
         #region Performance Testing
 
         private const int TEST_ITER = 100000;
