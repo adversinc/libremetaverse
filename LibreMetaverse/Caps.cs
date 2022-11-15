@@ -66,7 +66,6 @@ namespace OpenMetaverse
 
         private CapsClient _SeedRequest;
         private EventQueueClient _EventQueueCap = null;
-        private int Caps404Count = 0;
 
         /// <summary>Capabilities URI this system was initialized with</summary>
         public string SeedCapsURI => _SeedCapsURI;
@@ -302,11 +301,7 @@ namespace OpenMetaverse
                 exception.Response != null &&
                 ((HttpWebResponse)exception.Response).StatusCode == HttpStatusCode.NotFound)
             {
-                // 404 error
-                Caps404Count++;
-                
-                if(Caps404Count > 3) {
-                    Logger.Log("Seed capability returned a 404, capability system is aborting",
+                Logger.Log("Seed capability returned a 404, capability system is aborting",
                         Helpers.LogLevel.Error);
 
                     var response = (HttpWebResponse) ((WebException) error).Response;
@@ -319,12 +314,6 @@ namespace OpenMetaverse
                     } catch(Exception ex) {
                         Logger.Log($"CapsError callback error: {ex.Message}", Helpers.LogLevel.Error, ex);
                     }
-
-                } else {
-                    Logger.Log($"Seed capability returned a 404 (try {Caps404Count}), retrying", Helpers.LogLevel.Error);
-                    Thread.Sleep(3*1000);
-                    MakeSeedRequest();
-                }
             }
             else
             {
