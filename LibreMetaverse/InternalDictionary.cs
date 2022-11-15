@@ -55,6 +55,7 @@ namespace OpenMetaverse
         /// Gets the number of Key/Value pairs contained in the <seealso cref="T:InternalDictionary"/>
         /// </summary>
         public int Count { get { lock (Dictionary) return Dictionary.Count; } }
+        public int CountNoLock => Dictionary.Count;
 
         /// <summary>
         /// Initializes a new instance of the <seealso cref="T:InternalDictionary"/> Class 

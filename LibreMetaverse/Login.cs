@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2006-2016, openmetaverse.co
- * Copyright (c) 2019-2021, Sjofn, LLC
+ * Copyright (c) 2019-2022, Sjofn, LLC
  * All rights reserved.
  *
  * - Redistribution and use in source and binary forms, with or without 
@@ -110,9 +110,9 @@ namespace OpenMetaverse
         /// <remarks>plaintext password will be automatically hashed</remarks>
         public string Password;
         /// <summary>The agents starting location home or last</summary>
-        /// <remarks>Please use LoginLocation for custom region and Location</remarks>
+        /// <remarks>Either "last", "home", or a string encoded URI 
+        /// containing the simulator name and x/y/z coordinates e.g: uri:hooper&amp;128&amp;152&amp;17</remarks>
         public string Start;
-
         /// <summary>A string containing the client software channel information</summary>
         /// <example>Second Life Release</example>
         public string Channel;
@@ -1214,8 +1214,7 @@ namespace OpenMetaverse
         /// <param name="x">X coordinate to start at</param>
         /// <param name="y">Y coordinate to start at</param>
         /// <param name="z">Z coordinate to start at</param>
-        /// <returns>String with a URI that can be used to login to a specified
-        /// location</returns>
+        /// <returns>String with a URI that can be used to login to a specified location</returns>
         public static string StartLocation(string sim, int x, int y, int z)
         {
             return $"uri:{sim}&{x}&{y}&{z}";
@@ -1285,36 +1284,29 @@ namespace OpenMetaverse
                 loginParams.Channel = $"{Settings.USER_AGENT}";
             }
 
-            if((loginParams.Start != "home") && (loginParams.Start != "last"))
+            if (!string.IsNullOrEmpty(loginParams.LoginLocation))
             {
-                loginParams.Start = "home";
-                Logger.Log("The Start option only accepts home or last! " +
-                           "Please use LoginLocation to set a custom login location!", Helpers.LogLevel.Warning);
-            }
-
-            if (string.IsNullOrEmpty(loginParams.LoginLocation) == false)
+                var startLoc = new LocationParser(loginParams.LoginLocation.Trim());
+                loginParams.Start = startLoc.GetStartLocationUri();
+            } 
+            else
             {
-                var bits = loginParams.LoginLocation.Split('/');
-                if(bits.Length == 4)
+                switch (loginParams.Start)
                 {
-                    if(int.TryParse(bits[1],out var X) == true)
-                    {
-                        if (int.TryParse(bits[2], out var Y) == true)
-                        {
-                            if (int.TryParse(bits[3], out var Z) == true)
-                            {
-                                Logger.Log("Setting login location to: "
-                                           + loginParams.LoginLocation, Helpers.LogLevel.Info);
-                                loginParams.Start = StartLocation(bits[0], X, Y, Z);
-                            }
-                        }
-                    }
+                    case "home":
+                    case "last":
+                        break;
+                    default:
+                        var startLoc = new LocationParser(loginParams.Start.Trim());
+                        loginParams.Start = startLoc.GetStartLocationUri();
+                        break;
                 }
             }
 
             if (loginParams.Author == null)
+            {
                 loginParams.Author = string.Empty;
-
+            }
             #endregion
 
             // TODO: Allow a user callback to be defined for handling the cert
@@ -1418,33 +1410,51 @@ namespace OpenMetaverse
                 }
                 loginXmlRpc["options"] = options;
 
+                XmlRpcResponse loginResponse = null;
+
                 try
                 {
                     var loginArray = new ArrayList(1) { loginXmlRpc };
                     var request = new XmlRpcRequest(CurrentContext.MethodName, loginArray);
                     var cc = CurrentContext;
                     // Start the request
-                    Task.Run(async () =>
-                    {
-                        try
-                        {
+                    Task.Run(async () => {
+
+
+                        try {
                             var cts = new CancellationTokenSource();
                             cts.CancelAfter(cc.Timeout);
-                            var loginResponse = await HTTP_CLIENT.PostAsXmlRpcAsync(cc.URI, request, cts.Token);
+                            loginResponse = await HTTP_CLIENT.PostAsXmlRpcAsync(cc.URI, request, cts.Token);
                             cts.Dispose();
-                            
+
                             LoginReplyXmlRpcHandler(loginResponse, loginParams);
-                        }
-                        catch (Exception e)
-                        {
+                        } catch(Exception e) {
                             UpdateLoginStatus(LoginStatus.Failed,
-                                $"Error opening the login server connection: {e.Message}");
+                                $"Error opening the login server connection: {e.GetType().Name}: {e.Message}");
+
+                            try {
+                                string fname = string.Join("-", loginParams.FirstName, loginParams.LastName,
+                                    System.Diagnostics.Process.GetCurrentProcess().Id.ToString(),
+                                    DateTime.UtcNow.ToString("u"));
+                                System.IO.File.WriteAllText($"../../slbots_logs/http/xml-login-errors/{fname}",
+                                    loginResponse?.ToString());
+                                OpenMetaverse.Logger.Log("XML dumped", Helpers.LogLevel.Debug);
+                            } catch { }
                         }
                     });
                 }
                 catch (Exception e)
                 {
-                    UpdateLoginStatus(LoginStatus.Failed, $"Error opening the login server connection: {e}");
+                    UpdateLoginStatus(LoginStatus.Failed, $"Error opening the login server connection2: {e}");
+
+                    try {
+                        string fname = string.Join("-", loginParams.FirstName, loginParams.LastName,
+                            System.Diagnostics.Process.GetCurrentProcess().Id.ToString(),
+                            DateTime.UtcNow.ToString("u"));
+                        System.IO.File.WriteAllText($"../../slbots_logs/http/xml-login-errors/{fname}",
+                            loginResponse?.ToString());
+                        OpenMetaverse.Logger.Log("XML dumped", Helpers.LogLevel.Debug);
+                    }catch {}
                 }
 
                 #endregion
@@ -1457,6 +1467,10 @@ namespace OpenMetaverse
             LoginMessage = message;
 
             Logger.DebugLog($"Login status: {status.ToString()}: {message}", Client);
+            if(status == LoginStatus.Failed) {
+                Logger.Log($"Login status updated: {status.ToString()}: {message}\n{Environment.StackTrace}",
+                    Helpers.LogLevel.Debug);
+            }
 
             // If we reached a login resolution trigger the event
             if (status == LoginStatus.Success || status == LoginStatus.Failed)

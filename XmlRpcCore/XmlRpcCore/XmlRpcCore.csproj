@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+	<Product>XmlRpcCore</Product>
+    <OutputType>Library</OutputType>
+    <RootNamespace>XmlRpcCore</RootNamespace>
+    <AssemblyName>XmlRpcCore</AssemblyName>
+    <FileAlignment>512</FileAlignment>
+    <Authors>cinderblocks</Authors>
+    <Company>Sjofn LLC</Company>
+    <Version>3.1.2.77</Version>
+    <Description>A small extremely simple to use XmlRcp library</Description>
+    <Copyright>Copyright 2003 Nicholas Christopher, Copyright 2016-2020 Sjofn LLC. All Rights Reserved.</Copyright>
+    <PackageTags>xmlrpc,networking</PackageTags>
+	<PackageProjectUrl>https://github.com/cinderblocks/XmlRpcCore</PackageProjectUrl>
+    <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/cinderblocks/XmlRpcCore</RepositoryUrl>
+	<RepositoryType>git</RepositoryType>
+	<PackageReadmeFile>README.md</PackageReadmeFile>
+	<TargetFramework>net5.0</TargetFramework>
+	<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+	<IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+	<None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

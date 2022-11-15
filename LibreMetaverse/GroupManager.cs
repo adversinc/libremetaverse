@@ -26,6 +26,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using OpenMetaverse.Packets;
 using OpenMetaverse.StructuredData;
@@ -1049,6 +1050,8 @@ namespace OpenMetaverse
         {
             UUID requestID = UUID.Random();
             CapsClient req = null;
+            
+            //Logger.Log($"RequestGroupMembers {group}. Stacktrace:\n{Environment.StackTrace}", Helpers.LogLevel.Debug);
 
             if (Client.Network.CurrentSim != null 
                 && Client.Network.CurrentSim.Caps != null

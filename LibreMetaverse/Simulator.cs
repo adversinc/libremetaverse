@@ -31,6 +31,7 @@ using System.Linq;
 using System.Threading;
 using System.Net;
 using OpenMetaverse.Packets;
+using XmlRpcCore;
 
 namespace OpenMetaverse
 {
@@ -571,6 +572,10 @@ namespace OpenMetaverse
 
             // Force all the CAPS connections closed for this simulator
             Caps?.Disconnect(true);
+        }
+
+        protected override void LogDebug(string str, Helpers.LogLevel level) {
+            Logger.Log(str, level, Client);
         }
 
         /// <summary>

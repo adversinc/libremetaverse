@@ -1,5 +1,5 @@
 <#
- # Copyright (c) 2021, Sjofn LLC. All rights reserved.
+ # Copyright (c) 2021-2022, Sjofn LLC. All rights reserved.
  #
  # Permission to use, copy, modify, and/or distribute this script for any
  # purpose without fee is hereby granted.
@@ -14,6 +14,11 @@
  #>
 
  param([String]$PfxPasswd)
+
+ if ([string]::IsNullOrEmpty($PfxPasswd)) {
+	Write-Output "Certificate Password not supplied. Cannot sign package."
+	exit
+}
  
  Write-Output "Signing nupkgs..."
 

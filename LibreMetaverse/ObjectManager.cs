@@ -2676,6 +2676,9 @@ namespace OpenMetaverse
             uint[] killed = new uint[kill.ObjectData.Length];
             for (int i = 0; i < kill.ObjectData.Length; i++)
             {
+                // FIX: sometimes 0 localid is arriving. This causes the whole world to die!
+                if(kill.ObjectData[i].ID == 0) { continue; }
+
                 OnKillObject(new KillObjectEventArgs(simulator, kill.ObjectData[i].ID));
                 killed[i] = kill.ObjectData[i].ID;
             }
@@ -2692,6 +2695,9 @@ namespace OpenMetaverse
                     uint localID;
                     for (int i = 0; i < kill.ObjectData.Length; i++)
                     {
+                        // FIX: sometimes 0 localid is arriving. This causes the whole world to die!
+                        if(kill.ObjectData[i].ID == 0) { continue; }
+                        
                         localID = kill.ObjectData[i].ID;
 
                         if (simulator.ObjectsPrimitives.Dictionary.ContainsKey(localID))
@@ -2715,6 +2721,9 @@ namespace OpenMetaverse
                         uint localID;
                         for (int i = 0; i < kill.ObjectData.Length; i++)
                         {
+                            // FIX: sometimes 0 localid is arriving. This causes the whole world to die!
+                            if(kill.ObjectData[i].ID == 0) { continue; }
+                            
                             localID = kill.ObjectData[i].ID;
 
                             if (simulator.ObjectsAvatars.Dictionary.ContainsKey(localID))
@@ -3227,6 +3236,67 @@ namespace OpenMetaverse
             {
                 return new Avatar();
             }
+        }
+
+
+        /// <summary>
+        /// Returns object's root parent, traversing through the prim parents.
+        /// All objects in a chain should be in ObjectPrimitives/ObjectAvatars already.
+        /// </summary>
+        /// <returns>
+        /// The root parent prim (probably avatar) or null if chain traversing failed.
+        /// Returns self if there's no parent at all.
+        /// </returns>
+        public Primitive GetPrimRootParent(Primitive prim, Simulator sim = null) {
+            if(sim == null) {
+                sim = Client.Network.CurrentSim;
+            }
+
+            // Traverse through all parents, taking into account we could have either prim or avatar parent
+            while(prim.ParentID != 0) {
+                var parentId = prim.ParentID;
+                prim = sim.ObjectsPrimitives.Find(p => p.LocalID == parentId);
+                if(prim == null) {
+                    prim = sim.ObjectsAvatars.Find(a => a.LocalID == parentId);
+                }
+
+                if(prim == null) {
+                    return null;
+                }
+            }
+
+            return prim;
+        }
+
+        /// <summary>
+        /// Returns object's root position in-world, counting all parents.
+        /// </summary>
+        /// <returns>
+        /// The root parent prim (probably avatar) or null if chain traversing failed.
+        /// Returns self if there's no parent at all.
+        /// </returns>
+        public Vector3? GetPrimRootPosition(Primitive prim, Simulator sim = null) {
+            if(sim == null) {
+                sim = Client.Network.CurrentSim;
+            }
+
+            // Traverse through all parents, taking into account we could have either prim or avatar parent
+            Vector3 pos = prim.Position;
+            while(prim.ParentID != 0) {
+                var parentId = prim.ParentID;
+                prim = sim.ObjectsPrimitives.Find(p => p.LocalID == parentId);
+                if(prim == null) {
+                    prim = sim.ObjectsAvatars.Find(a => a.LocalID == parentId);
+                }
+
+                if(prim == null) {
+                    return null;
+                }
+
+                pos += prim.Position;
+            }
+
+            return pos;
         }
 
         #endregion Object Tracking Link
