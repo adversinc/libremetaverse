@@ -998,8 +998,8 @@ namespace OpenMetaverse
         }
 
         /// <summary>
-        /// Calls either <seealso cref="ReplaceOutfit"/> or
-        /// <seealso cref="AddToOutfit"/> depending on the value of
+        /// Calls either <seealso cref="AppearanceManager.ReplaceOutfit"/> or
+        /// <seealso cref="AppearanceManager.AddToOutfit"/> depending on the value of
         /// replaceItems
         /// </summary>
         /// <param name="wearables">List of wearable inventory items to add
@@ -2362,13 +2362,21 @@ namespace OpenMetaverse
             return set;
         }
 
-        private void DelayedRequestSetAppearance()
+        /// <summary>
+        /// Request appearance update after delay. Rewrites existing appearance
+        /// rebake timer.
+        /// </summary>
+        /// <param name="due">the rebake delay (ms)</param>
+        public void DelayedRequestSetAppearance(int due = REBAKE_DELAY)
         {
             if (RebakeScheduleTimer == null)
             {
                 RebakeScheduleTimer = new Timer(RebakeScheduleTimerTick);
             }
-            try { RebakeScheduleTimer.Change(REBAKE_DELAY, Timeout.Infinite); }
+
+            try {
+                RebakeScheduleTimer.Change(due, Timeout.Infinite);
+            }
             catch { }
         }
 

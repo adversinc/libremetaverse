@@ -308,6 +308,8 @@ namespace OpenMetaverse.Http
             } catch(Exception ex) {
                 // Logger.DebugLog("CapsBase.GetResponse(): " + ex.Message);
                 error = ex;
+            } finally {
+                response?.Close();
             }
 
             try {
