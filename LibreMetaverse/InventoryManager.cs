@@ -685,6 +685,7 @@ namespace OpenMetaverse
             {
                 foreach (InventoryBase o in objects)
                 {
+                    // For non-folder entries proceed links by pulling their original items
                     if (o.GetType() != typeof(InventoryFolder))
                     {
                         InventoryItem ob = (InventoryItem)o;
@@ -704,6 +705,9 @@ namespace OpenMetaverse
                         {
                             cleaned_list.Add(ob);
                         }
+                    } else {
+                        // Add folders as is
+                        cleaned_list.Add(o);
                     }
                 }
             }
@@ -760,7 +764,7 @@ namespace OpenMetaverse
         {
             string cap = owner == Client.Self.AgentID ? "FetchInventoryDescendents2" : "FetchLibDescendents2";
 
-            if (Client.Network.CurrentSim.Caps != null &&
+            if (Client.Network?.CurrentSim?.Caps != null &&
                 Client.Network.CurrentSim.Caps.CapabilityURI(cap) != null)
             {
                 RequestFolderContentsCap(folder, owner, folders, items, order);
@@ -783,7 +787,7 @@ namespace OpenMetaverse
                             SortOrder = (int) order
                         }
                 };
-                Client.Network.SendPacket(fetch);
+                Client?.Network?.SendPacket(fetch);
             }
         }
 
@@ -1449,8 +1453,17 @@ namespace OpenMetaverse
         /// <param name="item">The <seealso cref="UUID"/> of the inventory item to remove</param>
         public void RemoveItem(UUID item)
         {
-            List<UUID> items = new List<UUID>(1) { item };
-            Remove(items, null);
+            if (Client.Settings.USE_AIS_FOR_REMOVAL && Client.AisClient.IsAvailable)
+            {
+                Client.AisClient.RemoveItem(item, RemoveLocalUi).ConfigureAwait(false);
+            }
+            else
+            {
+                List<UUID> items = new List<UUID>(1) { item };
+#pragma warning disable CS0612 // Type or member is obsolete
+                Remove(items, null);
+#pragma warning restore CS0612 // Type or member is obsolete
+            }
         }
 
         /// <summary>
@@ -1459,15 +1472,26 @@ namespace OpenMetaverse
         /// <param name="folder">The <seealso cref="UUID"/> of the folder to remove</param>
         public void RemoveFolder(UUID folder)
         {
-            List<UUID> folders = new List<UUID>(1) { folder };
-            Remove(null, folders);
+            if (Client.AisClient.IsAvailable)
+            {
+                Client.AisClient.RemoveCategory(folder, RemoveLocalUi).ConfigureAwait(false);
+            } 
+            else
+            {
+                List<UUID> folders = new List<UUID>(1) { folder };
+#pragma warning disable CS0612 // Type or member is obsolete
+                Remove(null, folders);
+#pragma warning restore CS0612 // Type or member is obsolete
+            }
         }
 
         /// <summary>
-        /// Remove multiple items or folders from inventory
+        /// Remove multiple items or folders from inventory. Note that this uses the LLUDP method
+        /// which Second Life has deprecated and removed.
         /// </summary>
         /// <param name="items">A List containing the <seealso cref="UUID"/>s of items to remove</param>
         /// <param name="folders">A List containing the <seealso cref="UUID"/>s of the folders to remove</param>
+        [Obsolete]
         public void Remove(List<UUID> items, List<UUID> folders)
         {
             if ((items == null || items.Count == 0) && (folders == null || folders.Count == 0))
@@ -1583,7 +1607,9 @@ namespace OpenMetaverse
                     }
                 }
 
+#pragma warning disable CS0612 // Type or member is obsolete
                 Remove(remItems, remFolders);
+#pragma warning restore CS0612 // Type or member is obsolete
             }
         }
         #endregion Remove
@@ -1854,7 +1880,7 @@ namespace OpenMetaverse
         public void CreateLink(UUID folderID, UUID itemID, string name, string description,
             AssetType assetType, InventoryType invType, UUID transactionID, ItemCreatedCallback callback)
         {
-            if (Client.AisClient.IsAvailable)
+            if (Client.Settings.USE_AIS_FOR_LINKS && Client.AisClient.IsAvailable)
             {
                 OSDArray links = new OSDArray();
                 OSDMap link = new OSDMap
@@ -2063,7 +2089,7 @@ namespace OpenMetaverse
         /// <param name="transactionID"></param>
         public void RequestUpdateItems(List<InventoryItem> items, UUID transactionID)
         {
-            if (Client.AisClient.IsAvailable)
+            if (Client.Settings.USE_AIS_FOR_UPDATES && Client.AisClient.IsAvailable)
             {
                 foreach (var item in items)
                 {
