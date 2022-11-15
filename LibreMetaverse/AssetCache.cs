@@ -339,7 +339,13 @@ namespace OpenMetaverse
                 {
                     ++num;
                     size -= file.Length;
-                    file.Delete();
+
+                    try {
+                        file.Delete();
+                    } catch(Exception e) {
+                        Logger.Log($"Error deleting cache: {e.Message}", Helpers.LogLevel.Error);
+                    }
+
                     if (size < targetSize)
                     {
                         break;
