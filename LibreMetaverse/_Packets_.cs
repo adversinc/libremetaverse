@@ -643,6 +643,7 @@ namespace OpenMetaverse.Packets
         ChildAgentPositionUpdate = 196635,
         SoundTrigger = 196637,
         ObjectAnimation = 196638,
+        GenericStreamingMessage = 196639,
     }
 
     public abstract partial class Packet
@@ -1081,6 +1082,7 @@ namespace OpenMetaverse.Packets
                         case 27: return PacketType.ChildAgentPositionUpdate;
                         case 29: return PacketType.SoundTrigger;
                         case 30: return PacketType.ObjectAnimation;
+                        case 31: return PacketType.GenericStreamingMessage;
                     }
                     break;
             }
@@ -1478,6 +1480,7 @@ namespace OpenMetaverse.Packets
             if(type == PacketType.PacketAck) return new PacketAckPacket();
             if(type == PacketType.OpenCircuit) return new OpenCircuitPacket();
             if(type == PacketType.CloseCircuit) return new CloseCircuitPacket();
+            if(type == PacketType.GenericStreamingMessage) return new GenericStreamingMessagePacket();
             return null;
 
         }
@@ -1903,6 +1906,7 @@ namespace OpenMetaverse.Packets
                         case 27: return new ChildAgentPositionUpdatePacket(header, bytes, ref i);
                         case 29: return new SoundTriggerPacket(header, bytes, ref i);
                         case 30: return new ObjectAnimationPacket(header, bytes, ref i);
+                        case 31: return new GenericStreamingMessagePacket(header, bytes, ref i);
 
                     }
                     break;
